@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xiaomi Miner UI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #e2e8f0; }
+        .terminal-font { font-family: 'Fira Code', monospace; }
+        #log-window::-webkit-scrollbar { width: 6px; }
+        #log-window::-webkit-scrollbar-track { background: #1e293b; }
+        #log-window::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 flex items-center justify-center">
+
+    <div class="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <div class="lg:col-span-4 space-y-6">
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="bg-orange-500/20 p-2 rounded-lg">
+                        <i class="fa-solid fa-microchip text-orange-500 text-xl"></i>
+                    </div>
+                    <h1 class="text-xl font-bold text-white tracking-tight">Miner Control</h1>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Step 1: Auth Callback</label>
+                        <input type="text" id="login-url" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none transition" placeholder="Paste callback URL...">
+                        <button onclick="doLogin()" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg font-bold text-sm transition shadow-lg flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-key"></i> Initialize Session
+                        </button>
+                    </div>
+
+                    <hr class="border-slate-700">
+
+                    <div class="space-y-3">
+                        <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Step 2: Verification</label>
+                        <div class="flex gap-2">
+                            <input type="email" id="email" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm outline-none" placeholder="Target Email">
+                            <button onclick="sendCode()" class="bg-slate-700 hover:bg-slate-600 px-4 rounded-lg text-sm font-bold transition">Send</button>
+                        </div>
+                        <input type="text" id="code" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm outline-none" placeholder="Captcha Code">
+                    </div>
+
+                    <div class="space-y-2 pt-2">
+                        <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Step 3: Mode</label>
+                        <select id="mode" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm outline-none">
+                            <option value="1">Scan Only (Silent)</option>
+                            <option value="2">Scan & Auto-Redeem</option>
+                        </select>
+                        <button onclick="toggleMining()" id="btn-mine" class="w-full bg-green-600 hover:bg-green-500 text-white py-4 rounded-lg font-black text-lg transition shadow-lg mt-2">
+                            START MINER
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-8 flex flex-col gap-6">
+            
+            <div class="grid grid-cols-3 gap-4">
+                <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl flex flex-col items-center">
+                    <span class="text-xs text-slate-400 font-bold uppercase">Attempts</span>
+                    <span id="ui-attempts" class="text-2xl font-black text-white">0</span>
+                </div>
+                <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl flex flex-col items-center">
+                    <span class="text-xs text-slate-400 font-bold uppercase">Jackpots</span>
+                    <span id="ui-jackpots" class="text-2xl font-black text-green-400">0</span>
+                </div>
+                <div id="status-card" class="bg-slate-800 border border-slate-700 p-4 rounded-xl flex flex-col items-center border-l-4 border-l-slate-600">
+                    <span class="text-xs text-slate-400 font-bold uppercase">Status</span>
+                    <span id="ui-status" class="text-sm font-black text-slate-300">IDLE</span>
+                </div>
+            </div>
+
+            <div class="bg-slate-950 border border-slate-800 rounded-2xl flex flex-col shadow-2xl overflow-hidden h-full min-h-[500px]">
+                <div class="bg-slate-900/50 px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+                    <div class="flex gap-1.5">
+                        <div class="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50"></div>
+                        <div class="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
+                        <div class="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
+                    </div>
+                    <span class="text-[10px] terminal-font text-slate-500 uppercase tracking-widest">Live Engine Output</span>
+                </div>
+                <div id="log-window" class="p-6 terminal-font text-xs md:text-sm text-slate-300 overflow-y-auto space-y-1.5 leading-relaxed h-[400px]">
+                    <div class="text-slate-500">>> System ready. Awaiting initialization...</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let isRunning = false;
+        let attempts = 0;
+        let jackpots = 0;
+
+        function log(msg, color = "text-slate-300") {
+            const win = document.getElementById('log-window');
+            const time = new Date().toLocaleTimeString([], { hour12: false });
+            win.innerHTML += `<div><span class="text-slate-600">[${time}]</span> <span class="${color}">${msg}</span></div>`;
+            win.scrollTop = win.scrollHeight;
+        }
+
+        function updateStatus(text, colorClass, borderColor) {
+            const status = document.getElementById('ui-status');
+            const card = document.getElementById('status-card');
+            status.innerText = text;
+            status.className = `text-sm font-black ${colorClass}`;
+            card.style.borderLeftColor = borderColor;
+        }
+
+        async function doLogin() {
+            const url = document.getElementById('login-url').value;
+            if(!url) return log("❌ Login URL missing!", "text-red-400");
+            
+            log("🔑 Initializing login sequence...", "text-blue-400");
+            const res = await fetch('/login', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({url})
+            });
+            const data = await res.json();
+            if(data.status === 'success') log("✅ Session verified. Backend ready.", "text-green-400");
+            else log(`❌ Auth Error: ${data.msg}`, "text-red-400");
+        }
+
+        async function sendCode() {
+            const email = document.getElementById('email').value;
+            log(`📨 Requesting code for ${email}...`, "text-yellow-400");
+            const res = await fetch('/send_code', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email})
+            });
+            const data = await res.json();
+            log(data.status === 'success' ? "✅ Verification code triggered." : `❌ ${data.msg}`, "text-blue-400");
+        }
+
+        function toggleMining() {
+            const btn = document.getElementById('btn-mine');
+            if(isRunning) {
+                isRunning = false;
+                btn.innerText = "START MINER";
+                btn.className = "w-full bg-green-600 hover:bg-green-500 text-white py-4 rounded-lg font-black text-lg transition shadow-lg mt-2";
+                updateStatus("STOPPED", "text-red-400", "#f87171");
+                log("🛑 Miner process terminated.", "text-yellow-500");
+            } else {
+                const email = document.getElementById('email').value;
+                const code = document.getElementById('code').value;
+                if(!email || !code) return log("❌ Email & Code required!", "text-red-400");
+
+                isRunning = true;
+                btn.innerText = "STOP MINER";
+                btn.className = "w-full bg-red-600 hover:bg-red-500 text-white py-4 rounded-lg font-black text-lg transition shadow-lg mt-2";
+                updateStatus("RUNNING", "text-green-400", "#4ade80");
+                log("🚀 Engine started. Scanning network...", "text-green-400");
+                scanLoop();
+            }
+        }
+
+        async function scanLoop() {
+            if(!isRunning) return;
+
+            const email = document.getElementById('email').value;
+            const code = document.getElementById('code').value;
+            const mode = document.getElementById('mode').value;
+
+            try {
+                const res = await fetch('/scan_one', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email, code})
+                });
+                const responseData = await res.json();
+                
+                attempts++;
+                document.getElementById('ui-attempts').innerText = attempts;
+
+                if(responseData.status === 'error') {
+                    log(`⚠️ API Fail: ${responseData.msg}`, "text-red-400");
+                } else {
+                    const data = responseData.data;
+                    const imei = responseData.imei;
+
+                    if(data.code === 0) {
+                        jackpots++;
+                        document.getElementById('ui-jackpots').innerText = jackpots;
+                        const item = data.data.goodsList ? data.data.goodsList[0] : {goodsName: "Unknown"};
+                        log(`💎 FOUND: ${imei} (${item.goodsName})`, "text-green-400 font-bold");
+
+                        if(mode === "2") {
+                            log("🎁 Initiating auto-redemption...", "text-orange-400");
+                            const actId = item.actList ? item.actList[0].activityId : null;
+                            const redeemRes = await fetch('/redeem', {
+                                method: 'POST', headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({imei, email, code, goodsId: item.goodsId, actId, goodsName: item.goodsName})
+                            });
+                            const rData = await redeemRes.json();
+                            if(rData.data && rData.data.code === 0) {
+                                log("🏆 REDEEMED! Process complete.", "text-green-300 font-bold");
+                                toggleMining(); return;
+                            }
+                        }
+                    } else {
+                        log(`🔸 Try ${attempts}: ${imei} [Code: ${data.code}]`, "text-slate-500");
+                    }
+                }
+            } catch (e) { log("⚠️ Net Error", "text-red-500"); }
+            setTimeout(scanLoop, 1200);
+        }
+    </script>
+</body>
+</html>
