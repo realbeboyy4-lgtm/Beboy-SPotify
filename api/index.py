@@ -83,8 +83,14 @@ def send_code():
 
 @app.route('/scan_one', methods=['POST'])
 def scan_one():
-    email, code = request.json.get('email'), request.json.get('code')
-    imei = get_next_imei()
+    req_data = request.json
+    email = req_data.get('email')
+    code = req_data.get('code')
+    custom_imei = req_data.get('imei')
+    
+    # Use custom IMEI if provided, otherwise generate random
+    imei = custom_imei if custom_imei and len(custom_imei) >= 14 else get_next_imei()
+    
     url = "https://hd.c.mi.com/jp/eventapi/api/imeiexchange/getactinfo"
     try:
         mi_session.headers.update({"Referer": "https://www.mi.com/jp/imei-redemption/"})
@@ -126,29 +132,40 @@ HTML_TEMPLATE = """
             <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
                 <h1 class="text-xl font-bold text-white mb-6">Miner Control</h1>
                 <div class="space-y-4 text-sm">
+                    <label class="block text-xs text-slate-400 font-bold uppercase">Auth</label>
                     <input type="text" id="login-url" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 outline-none" placeholder="Callback URL">
                     <button onclick="doLogin()" class="w-full bg-blue-600 hover:bg-blue-500 py-2.5 rounded-lg font-bold transition">Initialize Session</button>
+                    
                     <hr class="border-slate-700">
+                    
+                    <label class="block text-xs text-slate-400 font-bold uppercase">Target Information</label>
+                    <input type="text" id="custom-imei" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 outline-none" placeholder="Custom IMEI (Leave empty for random)">
+                    
                     <div class="flex gap-2">
                         <input type="email" id="email" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 outline-none" placeholder="Email">
                         <button onclick="sendCode()" class="bg-slate-700 px-4 rounded-lg font-bold">Send</button>
                     </div>
                     <input type="text" id="code" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 outline-none" placeholder="Captcha">
+                    
                     <select id="mode" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 outline-none">
                         <option value="1">Scan Only</option>
                         <option value="2">Scan & Redeem</option>
                     </select>
-                    <button onclick="toggleMining()" id="btn-mine" class="w-full bg-green-600 hover:bg-green-500 py-4 rounded-lg font-black text-lg transition">START MINER</button>
+                    
+                    <button onclick="toggleMining()" id="btn-mine" class="w-full bg-green-600 hover:bg-green-500 py-4 rounded-lg font-black text-lg transition shadow-lg">START MINER</button>
                 </div>
             </div>
         </div>
         <div class="lg:col-span-8 flex flex-col gap-6">
             <div class="grid grid-cols-2 gap-4">
-                <div class="bg-slate-800 p-4 rounded-xl text-center"><span class="text-xs text-slate-400 font-bold block">Attempts</span><span id="ui-attempts" class="text-2xl font-black">0</span></div>
-                <div class="bg-slate-800 p-4 rounded-xl text-center"><span class="text-xs text-slate-400 font-bold block">Jackpots</span><span id="ui-jackpots" class="text-2xl font-black text-green-400">0</span></div>
+                <div class="bg-slate-800 p-4 rounded-xl text-center shadow-lg border border-slate-700"><span class="text-xs text-slate-400 font-bold block uppercase">Attempts</span><span id="ui-attempts" class="text-3xl font-black">0</span></div>
+                <div class="bg-slate-800 p-4 rounded-xl text-center shadow-lg border border-slate-700"><span class="text-xs text-slate-400 font-bold block uppercase text-green-400">Jackpots</span><span id="ui-jackpots" class="text-3xl font-black text-green-400">0</span></div>
             </div>
-            <div id="log-window" class="bg-slate-950 p-6 rounded-2xl text-xs font-mono h-[400px] overflow-y-auto">
-                <div class="text-slate-500">>> Ready...</div>
+            <div class="bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl flex flex-col overflow-hidden">
+                <div class="bg-slate-900/50 px-4 py-2 border-b border-slate-800 text-[10px] text-slate-500 font-mono">LIVE_LOG.TXT</div>
+                <div id="log-window" class="p-6 text-xs font-mono h-[420px] overflow-y-auto space-y-1">
+                    <div class="text-slate-500">>> Ready to initialize...</div>
+                </div>
             </div>
         </div>
     </div>
@@ -161,39 +178,59 @@ HTML_TEMPLATE = """
         }
         async function doLogin() {
             const url = document.getElementById('login-url').value;
-            log("🔑 Logging in...");
+            if(!url) return log("❌ URL Required", "text-red-400");
+            log("🔑 Authenticating...");
             const res = await fetch('/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url})});
             const data = await res.json();
-            log(data.status === 'success' ? "✅ Success!" : "❌ Error: " + data.msg);
+            log(data.status === 'success' ? "✅ Session established!" : "❌ Error: " + data.msg, data.status === 'success' ? "text-green-400" : "text-red-400");
         }
         async function sendCode() {
-            const res = await fetch('/send_code', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email:document.getElementById('email').value})});
-            log("📨 Code requested.");
+            const email = document.getElementById('email').value;
+            if(!email) return log("❌ Email Required", "text-red-400");
+            const res = await fetch('/send_code', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email})});
+            log("📨 Verification code requested.");
         }
         function toggleMining() {
             const btn = document.getElementById('btn-mine');
             isRunning = !isRunning;
             btn.innerText = isRunning ? "STOP MINER" : "START MINER";
-            btn.className = isRunning ? "w-full bg-red-600 py-4 rounded-lg font-black" : "w-full bg-green-600 py-4 rounded-lg font-black";
-            if(isRunning) scanLoop();
+            btn.className = isRunning ? "w-full bg-red-600 hover:bg-red-500 py-4 rounded-lg font-black text-lg transition shadow-lg" : "w-full bg-green-600 hover:bg-green-500 py-4 rounded-lg font-black text-lg transition shadow-lg";
+            if(isRunning) {
+                log("🚀 Miner process started...", "text-green-400");
+                scanLoop();
+            } else {
+                log("🛑 Miner process stopped.", "text-yellow-400");
+            }
         }
         async function scanLoop() {
             if(!isRunning) return;
             const email = document.getElementById('email').value;
             const code = document.getElementById('code').value;
-            const res = await fetch('/scan_one', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email, code})});
+            const imei = document.getElementById('custom-imei').value;
+            
+            const res = await fetch('/scan_one', {
+                method:'POST', 
+                headers:{'Content-Type':'application/json'}, 
+                body:JSON.stringify({email, code, imei})
+            });
             const d = await res.json();
+            
             attempts++; document.getElementById('ui-attempts').innerText = attempts;
+            
             if(d.data && d.data.code === 0) {
                 jackpots++; document.getElementById('ui-jackpots').innerText = jackpots;
                 log("💎 JACKPOT: " + d.imei, "text-green-400 font-bold");
                 if(document.getElementById('mode').value === "2") {
                     const item = d.data.data.goodsList[0];
-                    await fetch('/redeem', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({imei:d.imei, email, code, goodsId:item.goodsId, actId:item.actList[0].activityId, goodsName:item.goodsName})});
-                    log("🏆 Redeemed!"); toggleMining(); return;
+                    const r = await fetch('/redeem', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({imei:d.imei, email, code, goodsId:item.goodsId, actId:item.actList[0].activityId, goodsName:item.goodsName})});
+                    log("🏆 Redeemed successfully!"); toggleMining(); return;
                 }
-            } else { log("🔸 Try: " + d.imei, "text-slate-500"); }
-            setTimeout(scanLoop, 1200);
+            } else { 
+                log(`🔸 [Try ${attempts}] ${d.imei} : ${d.data.msg || d.data.code}`, "text-slate-500"); 
+            }
+            
+            // Short delay to prevent overwhelming the function
+            setTimeout(scanLoop, 1300);
         }
     </script>
 </body>
